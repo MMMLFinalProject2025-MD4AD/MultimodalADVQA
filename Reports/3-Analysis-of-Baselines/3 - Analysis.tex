@@ -1,0 +1,81 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2024_conference,times}
+
+% Stolen style files from ICLR 2024
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{url}
+
+\iclrfinalcopy
+
+\title{Team Name: Baseline Analysis}
+
+\author{
+  First Last 1\thanks{\hspace{4pt}Everyone Contributed Equally -- Alphabetical order} \hspace{2em} First Last 2$^*$ \hspace{2em} First Last 3$^*$ \hspace{2em} First Last 4$^*$ \\
+  \texttt{\{ID1, ID2, ID3, ID4\}@andrew.cmu.edu}
+  }
+
+\date{}
+
+\begin{document}
+\maketitle
+
+
+\section{Analysis (4 pages)}
+\points{2} This section should include plots.  For example, how key metrics vary with a specific hyperparameter, task complexity, etc.
+
+\subsection{\points{2} Intrinsic Metrics}
+These are not the task itself (they might overlap with auxiliary losses) but are skills the model should have.
+
+\paragraph{Intrinsic Metric 1}
+\paragraph{Intrinsic Metric 2}
+\paragraph{Intrinsic Metric 3}
+
+\clearpage
+
+% Update this table with your extrinsic and intrinsic metrics.  
+% Update rows with what you ran
+% How well did they do on every metric?
+\begin{table}[t]
+\centering
+\begin{tabular}{@{}lrr@{}}
+\toprule
+                            & \multicolumn{2}{c}{Dev} \\
+Methods                     & Detections $\uparrow$ & Invalid Actions $\downarrow$  \\
+\midrule
+Unimodal 1 \cite{} & & \\
+Unimodal 2 \cite{} & & \\
+Unimodal 3 \cite{} & & \\
+\midrule
+Simple Multimodal 1 \cite{} & &  \\
+Simple Multimodal 2 \cite{} & &  \\
+Simple Multimodal 3 \cite{} & &  \\
+\midrule
+Previous Approach 1 \cite{} & &  \\
+Previous Approach 2 \cite{} & &  \\
+Previous Approach 3 \cite{} & &  \\
+\bottomrule
+\end{tabular}
+\label{tab:intrinsic}
+\caption{\points{1} A complete table of intrinsic metrics}
+\end{table}
+
+\clearpage
+\subsection{ Qualitative Analysis and Examples (full page table)}
+\points{2} A full page table that includes: Example input, comparison of model outputs, theory about reason for failure. Every model presented should have at least one failure condition
+
+\paragraph{\points{3} Insights and insights}
+Two paragraphs on what you found and how they impact your expectations for the main model, or how they have inspired you to change your proposed approach, etc
+
+
+\bibliography{references}
+\bibliographystyle{iclr2024_conference}
+
+\appendix
+\section{Appendix}
+You may include other additional sections here.
+
+\end{document}
