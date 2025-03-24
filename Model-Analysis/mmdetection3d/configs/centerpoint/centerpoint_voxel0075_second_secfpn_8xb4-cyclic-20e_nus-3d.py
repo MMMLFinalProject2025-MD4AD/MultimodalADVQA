@@ -143,3 +143,17 @@ test_dataloader = dict(
     dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
 val_dataloader = dict(
     dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
+
+#-----------------------------Add by Patrick-----------------------------------#
+train_cfg = dict(
+    max_epochs=20,       # Train for 20 epochs
+    #val_interval=0       # Optional: no validation
+)
+
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        interval=1,        # Save every epoch
+        max_keep_ckpts=-1  # Keep all checkpoints
+    )
+)
