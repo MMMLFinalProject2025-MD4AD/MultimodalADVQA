@@ -130,11 +130,16 @@ test_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
+        data_prefix=dict(
+            pts='samples/LIDAR_TOP',
+            sweeps='sweeps/LIDAR_TOP',
+            img='samples/CAM_FRONT'   # 🔥 this line is the key
+        ),        
         ann_file='nuscenes_infos_val.pkl',
         pipeline=test_pipeline,
         metainfo=metainfo,
         modality=input_modality,
-        data_prefix=data_prefix,
+        #data_prefix=data_prefix,
         test_mode=True,
         box_type_3d='LiDAR',
         backend_args=backend_args))
@@ -147,12 +152,17 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
+        data_prefix=dict(
+            pts='samples/LIDAR_TOP',
+            sweeps='sweeps/LIDAR_TOP',
+            img='samples/CAM_FRONT'   # 🔥 this line is the key
+        ),        
         ann_file='nuscenes_infos_val.pkl',
         pipeline=test_pipeline,
         metainfo=metainfo,
         modality=input_modality,
         test_mode=True,
-        data_prefix=data_prefix,
+        #data_prefix=data_prefix,
         box_type_3d='LiDAR',
         backend_args=backend_args))
 
@@ -164,6 +174,7 @@ val_evaluator = dict(
     backend_args=backend_args)
 test_evaluator = val_evaluator
 
-vis_backends = [dict(type='LocalVisBackend')]
+vis_backends=[dict(type='LocalVisBackend', save_dir='./work_dirs/centerpoint_voxel0075_second_secfpn_8xb4-cyclic-20e_nus-3d/eval_epoch10/pred_instances_3d/plots')]
+
 visualizer = dict(
     type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')

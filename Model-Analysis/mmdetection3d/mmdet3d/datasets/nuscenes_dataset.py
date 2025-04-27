@@ -245,4 +245,6 @@ class NuScenesDataset(Det3DDataset):
             return data_list
         else:
             data_info = super().parse_data_info(info)
+            if 'token' in info:
+                data_info['sample_token'] = info['token']
             return data_info

@@ -12,7 +12,7 @@ class_names = [
     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
     'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
 ]
-data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
+data_prefix = dict(pts='samples/LIDAR_TOP', sweeps='sweeps/LIDAR_TOP', img='samples/CAM_FRONT')
 model = dict(
     data_preprocessor=dict(
         voxel_layer=dict(
@@ -133,16 +133,51 @@ test_pipeline = [
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range)
         ]),
-    dict(type='Pack3DDetInputs', keys=['points'])
+    dict(type='Pack3DDetInputs', keys=['points', 'img', 'gt_bboxes_3d', 'gt_labels_3d'],
+        meta_keys=[
+        'lidar_path',
+        'token',  # ✅ Add this line
+        'sample_idx',
+        'box_type_3d',
+        'box_mode_3d',
+        'lidar2cam',
+        'cam2img',
+        'img_path',
+        'pcd_horizontal_flip',
+        'pcd_vertical_flip',
+        'pcd_rotation',
+        'pcd_scale_factor',
+        'pcd_trans',
+        'transformation_3d_flow',
+        'num_pts_feats',
+        'points',
+        'gt_bboxes_3d',
+        'gt_labels_3d'
+    ]
+    )
 ]
 train_dataloader = dict(
     dataset=dict(
         dataset=dict(
             pipeline=train_pipeline, metainfo=dict(classes=class_names))))
 test_dataloader = dict(
-    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
+    dataset=dict(pipeline=test_pipeline, 
+    data_root='data/nuscenes/',  # 🔥 This line is critical
+    data_prefix=dict(
+        pts='samples/LIDAR_TOP',
+        sweeps='sweeps/LIDAR_TOP',
+        img='samples/CAM_FRONT'  # ✅ must be here
+    ),    
+    metainfo=dict(classes=class_names)))
 val_dataloader = dict(
-    dataset=dict(pipeline=test_pipeline, metainfo=dict(classes=class_names)))
+    dataset=dict(pipeline=test_pipeline, 
+    data_root='data/nuscenes/',  # 🔥 This line is critical
+    data_prefix=dict(
+        pts='samples/LIDAR_TOP',
+        sweeps='sweeps/LIDAR_TOP',
+        img='samples/CAM_FRONT'  # ✅ must be here
+    ),    
+    metainfo=dict(classes=class_names)))
 
 #-----------------------------Add by Patrick-----------------------------------#
 train_cfg = dict(
@@ -155,5 +190,15 @@ default_hooks = dict(
         type='CheckpointHook',
         interval=1,        # Save every epoch
         max_keep_ckpts=-1  # Keep all checkpoints
-    )
+    ),
+    visualization=dict(
+        type='Det3DVisualizationHook',
+        draw=True,
+        show=False,
+        interval=1,
+        test_out_dir='./work_dirs/centerpoint_voxel0075_second_secfpn_8xb4-cyclic-20e_nus-3d/eval_epoch10/pred_instances_3d/plots',
+        vis_task='lidar_det',
+        score_thr=0.3,
+        img_prefix='data/nuscenes/samples'
+    )    
 )

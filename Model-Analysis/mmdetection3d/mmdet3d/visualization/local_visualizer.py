@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import time
+from open3d.visualization.rendering import Camera
 from typing import List, Optional, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -141,10 +142,12 @@ class Det3DLocalVisualizer(DetLocalVisualizer):
             self.set_points(points, pcd_mode=pcd_mode, frame_cfg=frame_cfg)
         self.multi_imgs_col = multi_imgs_col
         self.fig_show_cfg.update(fig_show_cfg)
+        self.save_dir = save_dir
 
         self.flag_pause = False
         self.flag_next = False
         self.flag_exit = False
+        self._saved_tokens = set()
 
     def _clear_o3d_vis(self) -> None:
         """Clear open3d vis."""
@@ -628,6 +631,9 @@ class Det3DLocalVisualizer(DetLocalVisualizer):
         """
 
         # Only visualize when there is at least one instance
+        print(f'[DEBUG] data_input.keys() = {data_input.keys()}')
+        print(f'[DEBUG] data_input["points"] = {data_input.get("points", None)}')
+        print(f'[DEBUG] Number of predicted boxes = {len(instances)}')
         if not len(instances) > 0:
             return None
 
@@ -977,6 +983,17 @@ class Det3DLocalVisualizer(DetLocalVisualizer):
         assert vis_task in (
             'mono_det', 'multi-view_det', 'lidar_det', 'lidar_seg',
             'multi-modality_det'), f'got unexpected vis_task {vis_task}.'
+
+        print(f"[DEBUG] metainfo = {getattr(data_sample, 'metainfo', {})}")        
+        sample_token = data_sample.metainfo.get('token', None)
+        print(f"sample_token = {sample_token}")
+        # Only save once per token
+        if sample_token in self._saved_tokens:
+            return  # Skip — already saved
+
+        # Mark as saved
+        self._saved_tokens.add(sample_token)            
+
         classes = self.dataset_meta.get('classes', None)
         # For object detection datasets, no palette is saved
         palette = self.dataset_meta.get('palette', None)
@@ -1097,4 +1114,163 @@ class Det3DLocalVisualizer(DetLocalVisualizer):
                 mmcv.imwrite(drawn_img[..., ::-1],
                              out_file[:-4] + '_2d' + out_file[-4:])
         else:
-            self.add_image(name, drawn_img_3d, step)
+            interested_token = ["510c3f937ce54fafa51f9c9f98f0a4a5",
+                                 "594881e10bca4f689d5a6b97ab3d763d",
+                                 "796b1988dd254f74bf2fb19ba9c5b8c6",
+                                 "948b555d974b45e087b3d746a4cdf677",
+                                 "23e7d17b256348638af3b2739b80a5ca",
+                                 "c3286d413f524369ac040fbcd0b0e9b6",
+                                 "f319a0ca1d9d4f1d8f2d1401a9ec6f02",
+                                 "92bf51f4b2c447b5a8e068e25cf1f980"]
+
+            if out_file is None and drawn_img_3d is not None and isinstance(drawn_img_3d, np.ndarray):
+                self.add_image(name, drawn_img_3d, step)
+            elif vis_task == 'lidar_det' and hasattr(self, 'o3d_vis') and sample_token in interested_token:
+
+                import open3d as o3d
+                import numpy as np
+                import torch
+
+                # Extract LiDAR points
+                points_np = data_input['points']
+                if isinstance(points_np, torch.Tensor):
+                    points_np = points_np.cpu().numpy()
+
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points_np[:, :3])
+                pcd.paint_uniform_color([0.5, 0.5, 0.5])  # optional gray color
+                self._pcd = pcd
+
+                self._instances = []
+
+                # Ground-truth 3D boxes (green)
+                '''
+                if hasattr(data_sample, 'gt_instances_3d') and data_sample.gt_instances_3d is not None:
+                    print("[DEBUG] gt_instances_3d keys =", data_sample.gt_instances_3d.keys())
+                    input()
+                    gt_bboxes = data_sample.gt_instances_3d.bboxes_3d.tensor  # (N, 7)
+                    if isinstance(gt_bboxes, torch.Tensor):
+                        gt_bboxes = gt_bboxes.cpu().numpy()
+                    for box in gt_bboxes:
+                        center = box[:3]
+                        dims = box[3:6]
+                        yaw = box[6]
+
+                        gt_box3d = o3d.geometry.OrientedBoundingBox()
+                        gt_box3d.center = center
+                        gt_box3d.extent = dims
+                        R = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, yaw])
+                        gt_box3d.R = R
+
+                        gt_line = o3d.geometry.LineSet.create_from_oriented_bounding_box(gt_box3d)
+                        gt_line.paint_uniform_color([0.0, 1.0, 0.0])  
+                        self._instances.append((gt_line, 'gt'))
+                '''
+
+                # Prediction 3D boxes (red)
+                if pred_instances_3d is not None:
+                    bboxes_tensor = pred_instances_3d.bboxes_3d.tensor  # (N, 7)
+                    if isinstance(bboxes_tensor, torch.Tensor):
+                        bboxes_tensor = bboxes_tensor.cpu().numpy()
+
+                # Sample color palette: you can adjust or use your dataset_meta["palette"]
+                class_palette = self.dataset_meta.get('palette', None)
+
+                # Get predicted labels
+                labels_np = pred_instances_3d.labels_3d.cpu().numpy()
+
+                for box, label in zip(bboxes_tensor, labels_np):
+                    center = box[:3]
+                    dims = box[3:6]
+                    yaw = box[6]
+                    box3d = o3d.geometry.OrientedBoundingBox()
+                    box3d.center = center
+                    box3d.extent = dims
+                    R = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, yaw])
+                    box3d.R = R
+                    line_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(box3d)
+    
+                    color = class_palette[label % len(class_palette)]  # fallback if label exceeds palette
+                    line_set.paint_uniform_color(color)
+                    self._instances.append(line_set)
+
+                    '''
+
+                    for box in bboxes_tensor:
+                        center = box[:3]
+                        dims = box[3:6]
+                        yaw = box[6]
+
+                        # Build Open3D box from center, dims, yaw
+                        box3d = o3d.geometry.OrientedBoundingBox()
+                        box3d.center = center
+                        box3d.extent = dims
+                        R = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, yaw])
+                        box3d.R = R
+                        line_set = o3d.geometry.LineSet.create_from_oriented_bounding_box(box3d)
+                        line_set.paint_uniform_color([1.0, 0.0, 0.0])  # red box
+                        self._instances.append(line_set)                
+                    '''
+
+                # Always save in self.save_dir (default fallback if None)
+                save_dir = self.save_dir or "./work_dirs/lidar_vis"
+
+                # Final filename format
+                safe_token = sample_token.replace("/", "_")
+                print(f"save_dir = {save_dir}")
+                o3d_out_file = f"{save_dir}/{safe_token}_lidar_vis.png"                    
+
+                print(f'[INFO] Saving Open3D LiDAR visualization to {o3d_out_file}')
+
+                # 1. Create offscreen renderer
+                renderer = o3d.visualization.rendering.OffscreenRenderer(1920, 1080)
+                scene = renderer.scene
+
+                # 2. Add point cloud
+                mat = o3d.visualization.rendering.MaterialRecord()
+                mat.shader = "defaultUnlit"
+                scene.add_geometry("pcd", self._pcd, mat)
+                mat.point_size = 3.0  #use the defined material variable
+
+                # 3. Add 3D boxes
+                box_mat = o3d.visualization.rendering.MaterialRecord()
+                box_mat.shader = "unlitLine"
+                box_mat.line_width = 3.0  # Try increasing to 4.0 or 5.0 if needed
+                for i, box in enumerate(self._instances):
+                    scene.add_geometry(f"box_{i}", box, box_mat)
+
+                # After scene.add_geometry(...)
+                bounds = scene.bounding_box
+                center = bounds.get_center()
+                extent = bounds.get_extent()
+
+                # Set camera closer to scene center with good elevation
+                bounds = scene.bounding_box
+                center = bounds.get_center()
+                extent = bounds.get_extent()
+                #eye = center + [0, -extent[1] * 0.3, extent[2] * 0.3]  # closer and slightly above
+                #up = [0, 0, 1]
+
+                # Place camera directly above the scene, looking straight down
+                eye = center + [0, 0, extent[2] * 4]  # Eye above the center
+                up = [0, 1, 0]  # Y-axis points "up" in the image frame
+
+                scene.camera.look_at(center, eye, up)
+                scene.camera.set_projection(
+                        60.0,                 # FOV
+                        1920 / 1080,          # Aspect ratio
+                        0.1,                  # Near plane
+                        1000.0,               # Far plane
+                        Camera.FovType.Vertical  # ✅ Required fifth argument
+                )
+
+                # 5. Render and save
+                img = renderer.render_to_image()
+                o3d.io.write_image(o3d_out_file, img)
+                import gc
+                del renderer
+                gc.collect()
+                print(f'[OK] Saved offscreen image to {o3d_out_file}')
+            else:
+                print(f'[WARN] Skipped adding image for {name} — drawn_img_3d={drawn_img_3d}')            
+            #self.add_image(name, drawn_img_3d, step)

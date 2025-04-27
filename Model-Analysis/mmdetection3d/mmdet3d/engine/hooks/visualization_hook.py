@@ -64,8 +64,11 @@ class Det3DVisualizationHook(Hook):
                  draw_gt: bool = False,
                  draw_pred: bool = True,
                  show_pcd_rgb: bool = False,
-                 backend_args: Optional[dict] = None):
+                 backend_args: Optional[dict] = None,
+                 img_prefix: Optional[str] = 'data/nuscenes/samples'):
         self._visualizer: Visualizer = Visualizer.get_current_instance()
+        if hasattr(self._visualizer, "save_dir") and test_out_dir is not None:
+            self._visualizer.save_dir = test_out_dir
         self.interval = interval
         self.score_thr = score_thr
         self.show = show
@@ -77,6 +80,7 @@ class Det3DVisualizationHook(Hook):
                           'without storing data, so vis_backends '
                           'needs to be excluded.')
         self.vis_task = vis_task
+        self.img_prefix = img_prefix
 
         if show and wait_time == -1:
             print_log(
@@ -191,15 +195,28 @@ class Det3DVisualizationHook(Hook):
                 assert 'img_path' in data_sample, \
                     'img_path is not in data_sample'
                 img_path = data_sample.img_path
+
+                def resolve_full_img_path(p):
+                    if osp.isabs(p) or not self.img_prefix:
+                        return p
+                    if '__CAM_' in p:
+                        cam_name = p.split('__')[1]
+                        return osp.join(self.img_prefix, cam_name, p)
+                    return osp.join(self.img_prefix, p)
+
                 if isinstance(img_path, list):
                     img = []
                     for single_img_path in img_path:
+                        full_path = resolve_full_img_path(single_img_path)
+                        print(f'[HOOK PATCH] Resolved image path: {full_path}')                            
                         img_bytes = get(
-                            single_img_path, backend_args=self.backend_args)
+                            full_path, backend_args=self.backend_args)
                         single_img = mmcv.imfrombytes(
                             img_bytes, channel_order='rgb')
                         img.append(single_img)
                 else:
+                    full_path = resolve_full_img_path(img_path)
+                    print(f'[HOOK PATCH] Resolved image path: {full_path}')                        
                     img_bytes = get(img_path, backend_args=self.backend_args)
                     img = mmcv.imfrombytes(img_bytes, channel_order='rgb')
                 data_input['img'] = img
@@ -215,7 +232,8 @@ class Det3DVisualizationHook(Hook):
                 assert 'lidar_path' in data_sample, \
                     'lidar_path is not in data_sample'
                 lidar_path = data_sample.lidar_path
-                num_pts_feats = data_sample.num_pts_feats
+                #num_pts_feats = data_sample.num_pts_feats
+                num_pts_feats = data_sample.metainfo.get('num_pts_feats', None)
                 pts_bytes = get(lidar_path, backend_args=self.backend_args)
                 points = np.frombuffer(pts_bytes, dtype=np.float32)
                 points = points.reshape(-1, num_pts_feats)
